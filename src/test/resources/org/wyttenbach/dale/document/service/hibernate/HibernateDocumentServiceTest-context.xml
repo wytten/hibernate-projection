@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-2.0.xsd
+  ">
+
+	<import resource="classpath:hibernate-session-factory.xml" />
+
+	<bean id="sessionFactory" parent="abstractSessionFactory" />
+
+	<bean id="documentDAO" class="org.wyttenbach.dale.document.dao.hibernate.HibernateDocumentDAO">
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+
+	<bean id="documentDTOToDocument" class="org.wyttenbach.dale.document.transform.DocumentDTOToDocument">
+	</bean>
+
+	<bean id="documentToDocumentDTO" class="org.wyttenbach.dale.document.transform.DocumentToDocumentDTO">
+	</bean>
+
+	<bean id="documentService" class="org.wyttenbach.dale.document.service.hibernate.HibernateDocumentService">
+		<property name="documentDAO" ref="documentDAO" />
+		<property name="documentDTOToDocument" ref="documentDTOToDocument" />
+		<property name="documentToDocumentDTO" ref="documentToDocumentDTO" />
+	</bean>
+
+</beans>
