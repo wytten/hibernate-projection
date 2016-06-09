@@ -8,8 +8,9 @@
 	<description></description>
 
     <properties>
-        <spring.version>2.5.6</spring.version>
+        <spring.version>3.0.7.RELEASE</spring.version>
         <hibernate.version>3.3.1.GA</hibernate.version>
+        <slf4j.version>1.6.2</slf4j.version>
     </properties>
 
     <build>
@@ -27,11 +28,11 @@
     </build>
 
 	<dependencies>
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring</artifactId>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-orm</artifactId>
 			<version>${spring.version}</version>
-		</dependency>
+        </dependency>
 		<dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-core</artifactId>
@@ -50,12 +51,12 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.5.6</version>
+			<version>${slf4j.version}</version>
         </dependency>   
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>1.5.6</version>
+			<version>${slf4j.version}</version>
         </dependency>   
 
 		<!-- provided scope -->
