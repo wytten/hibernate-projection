@@ -4,12 +4,16 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.ProjectionList;
-import org.hibernate.criterion.Projections;
-import org.hibernate.criterion.Restrictions;
-import org.springframework.orm.hibernate3.support.HibernateDaoSupport;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Order;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Selection;
+
+import org.hibernate.SessionFactory;
+import org.springframework.transaction.annotation.Transactional;
 import org.wyttenbach.dale.projection.QuerySpecification;
 import org.wyttenbach.dale.projection.SearchSpecification;
 import org.wyttenbach.dale.projection.Specification;
@@ -17,60 +21,73 @@ import org.wyttenbach.dale.projection.Transform;
 import org.wyttenbach.dale.projection.Specification.Condition;
 import org.wyttenbach.dale.projection.Specification.SortOrder;
 
+@Transactional(readOnly = true)
 public abstract class HibernateProjectionServiceSupport<DTO extends Serializable, PERSISTABLE> {
 
 	private Class<PERSISTABLE> persistentClass;
+
+	private SessionFactory sessionFactory;
 
 	public HibernateProjectionServiceSupport(Class<PERSISTABLE> class1) {
 		this.persistentClass = class1;
 	}
 
-	protected abstract HibernateDaoSupport getProjectionDAO();
+	public void setSessionFactory(SessionFactory sessionFactory) {
+		this.sessionFactory = sessionFactory;
+	}
+
+	protected SessionFactory getSessionFactory() {
+		return sessionFactory;
+	}
 
 	protected abstract Transform<PERSISTABLE, DTO> getProjectionTransform();
 
-	private List<?> execute(Specification spec, ProjectionList projections) {
-		DetachedCriteria criteria = DetachedCriteria.forClass(persistentClass);
-
-		// project
-		if (projections != null && projections.getLength() > 0) {
-			criteria.setProjection(projections);
-		}
+	private <R> List<R> execute(Specification spec, CriteriaBuilder cb,
+			CriteriaQuery<R> criteria, Root<PERSISTABLE> root) {
 
 		// filter
 		if (spec.getConditions() != null) {
+			List<Predicate> predicates = new ArrayList<Predicate>();
 			for (Condition condition : spec.getConditions()) {
-				criteria.add(Restrictions.eq(condition.property,
+				predicates.add(cb.equal(root.get(condition.property),
 						condition.value));
 			}
+			criteria.where(predicates.toArray(new Predicate[0]));
 		}
 
 		// order
 		if (spec.getSortOrders() != null) {
+			List<Order> orders = new ArrayList<Order>();
 			for (SortOrder sort : spec.getSortOrders()) {
 				switch (sort.direction) {
 				case ASCENDING:
-					criteria.addOrder(Order.asc(sort.property));
+					orders.add(cb.asc(root.get(sort.property)));
 					break;
 				case DESCENDING:
-					criteria.addOrder(Order.desc(sort.property));
+					orders.add(cb.desc(root.get(sort.property)));
 					break;
 				}
 			}
+			criteria.orderBy(orders);
 		}
 
 		// limit
+		var query = sessionFactory.getCurrentSession().createQuery(criteria);
 		if (spec.getMaxResults() != null) {
-			return getProjectionDAO().getHibernateTemplate().findByCriteria(criteria,
-					spec.getFirstResult(), spec.getMaxResults());
+			query.setFirstResult(spec.getFirstResult());
+			query.setMaxResults(spec.getMaxResults());
 		}
 
-		return getProjectionDAO().getHibernateTemplate().findByCriteria(criteria);
+		return query.getResultList();
 	}
 
-	@SuppressWarnings("unchecked")
 	public List<DTO> search(SearchSpecification spec) {
-		List<PERSISTABLE> list = (List<PERSISTABLE>) execute(spec, null);
+		CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+		CriteriaQuery<PERSISTABLE> criteria = cb.createQuery(persistentClass);
+		Root<PERSISTABLE> root = criteria.from(persistentClass);
+		criteria.select(root);
+
+		List<PERSISTABLE> list = execute(spec, cb, criteria, root);
 		List<DTO> results = new ArrayList<DTO>();
 		for (PERSISTABLE p : list) {
 			DTO dto = getProjectionTransform().doTransform(p);
@@ -79,36 +96,50 @@ public abstract class HibernateProjectionServiceSupport<DTO extends Serializable
 		return results;
 	}
 
-	@SuppressWarnings("unchecked")
 	public List<?> query(QuerySpecification spec) {
-		List<?> results = new ArrayList();
-		if (spec.getProjections() != null && spec.getProjections().size() > 0) {
-			ProjectionList projections = Projections.projectionList();
-			for (QuerySpecification.Projection projection : spec
-					.getProjections()) {
-				switch (projection.function) {
-				case MAX:
-					projections.add(Projections.max(projection.property));
-					break;
-				case MIN:
-					projections.add(Projections.min(projection.property));
-					break;
-				case AVG:
-					projections.add(Projections.avg(projection.property));
-					break;
-				case COUNT:
-					projections.add(Projections.rowCount());
-					break;
-				case GROUP_BY:
-					projections.add(Projections
-							.groupProperty(projection.property));
-					break;
-				}
-			}
-			results = execute(spec, projections);
+		if (spec.getProjections() == null || spec.getProjections().isEmpty()) {
+			return new ArrayList<Object>();
 		}
 
-		return results;
+		CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+		// an Object-typed query yields a scalar for a single selection and
+		// Object[] for several, matching the old Hibernate ProjectionList
+		CriteriaQuery<Object> criteria = cb.createQuery();
+		Root<PERSISTABLE> root = criteria.from(persistentClass);
+
+		List<Selection<?>> selections = new ArrayList<Selection<?>>();
+		List<Expression<?>> groupings = new ArrayList<Expression<?>>();
+		for (QuerySpecification.Projection projection : spec.getProjections()) {
+			switch (projection.function) {
+			case MAX:
+				selections.add(cb.greatest(comparable(root, projection.property)));
+				break;
+			case MIN:
+				selections.add(cb.least(comparable(root, projection.property)));
+				break;
+			case AVG:
+				selections.add(cb.avg(root.<Number> get(projection.property)));
+				break;
+			case COUNT:
+				selections.add(cb.count(root));
+				break;
+			case GROUP_BY:
+				Expression<?> property = root.get(projection.property);
+				selections.add(property);
+				groupings.add(property);
+				break;
+			}
+		}
+		criteria.multiselect(selections);
+		criteria.groupBy(groupings);
+
+		return execute(spec, cb, criteria, root);
+	}
+
+	// MIN/MAX apply to any comparable property (e.g. dates), not just numbers
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private static Expression<Comparable> comparable(Root<?> root, String property) {
+		return (Expression) root.get(property);
 	}
 
 }

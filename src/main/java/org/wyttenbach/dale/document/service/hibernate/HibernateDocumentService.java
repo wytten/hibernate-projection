@@ -1,18 +1,19 @@
 package org.wyttenbach.dale.document.service.hibernate;
 
-import org.springframework.orm.hibernate3.support.HibernateDaoSupport;
-import org.wyttenbach.dale.document.dao.hibernate.HibernateDocumentDAO;
+import org.springframework.transaction.annotation.Transactional;
+import org.wyttenbach.dale.document.dao.DocumentDAO;
 import org.wyttenbach.dale.document.dto.DocumentDTO;
 import org.wyttenbach.dale.document.model.Document;
 import org.wyttenbach.dale.document.service.DocumentService;
 import org.wyttenbach.dale.projection.Transform;
 import org.wyttenbach.dale.projection.hibernate.HibernateProjectionServiceSupport;
 
+@Transactional
 public class HibernateDocumentService extends
 		HibernateProjectionServiceSupport<DocumentDTO, Document> implements
 		DocumentService {
 
-	private HibernateDocumentDAO documentDAO;
+	private DocumentDAO documentDAO;
 
 	private Transform<DocumentDTO, Document> documentDTOToDocument;
 
@@ -22,7 +23,7 @@ public class HibernateDocumentService extends
 		super(Document.class);
 	}
 
-	public void setDocumentDAO(HibernateDocumentDAO documentDAO) {
+	public void setDocumentDAO(DocumentDAO documentDAO) {
 		this.documentDAO = documentDAO;
 	}
 
@@ -41,6 +42,7 @@ public class HibernateDocumentService extends
 		documentDAO.create(document);
 	}
 
+	@Transactional(readOnly = true)
 	public DocumentDTO getDocument(Long documentId) {
 		Document document = documentDAO.read(documentId);
 		DocumentDTO dto = documentToDocumentDTO.doTransform(document);
@@ -56,11 +58,6 @@ public class HibernateDocumentService extends
 		Document document = new Document();
 		document.setId(dto.getId());
 		documentDAO.delete(document);
-	}
-
-	@Override
-	protected HibernateDaoSupport getProjectionDAO() {
-		return documentDAO;
 	}
 
 	@Override
