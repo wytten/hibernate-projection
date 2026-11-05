@@ -5,9 +5,13 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit38.AbstractJUnit38SpringContextTests;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.wyttenbach.dale.document.dao.DocumentDAO;
 import org.wyttenbach.dale.document.dto.DocumentDTO;
 import org.wyttenbach.dale.document.service.DocumentService;
@@ -17,8 +21,8 @@ import org.wyttenbach.dale.projection.QuerySpecification.Projection;
 import org.wyttenbach.dale.projection.Specification.Condition;
 import org.wyttenbach.dale.projection.Specification.SortOrder;
 
-@ContextConfiguration
-public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTests {
+@SpringJUnitConfig
+public class HibernateDocumentServiceTest {
 
 	private static final String FEDERAL = "Federal";
 
@@ -40,8 +44,8 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		return document;
 	}
 	
-	@Override
-	protected void setUp() throws Exception {
+	@BeforeEach
+	void setUp() {
 		int i=0;
 		addDocument(FEDERAL, "" + ++i, "Hello y", getDate(i), 100L);
 		addDocument(STATE, "" + ++i, "Hello 3", getDate(i), 100L);
@@ -59,22 +63,24 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		return today.getTime();
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
+	@AfterEach
+	void tearDown() {
 		List<DocumentDTO> docs = (List<DocumentDTO>) documentService.search(new SearchSpecification());
 		for (DocumentDTO document : docs) {
 			documentService.deleteDocument(document);
 		}
 	}
 
-	public void testSearch() throws Exception {
+	@Test
+	void testSearch() {
 		SearchSpecification spec = new SearchSpecification();
 		spec.addCondition(new Condition(DocumentDAO.BUS_SEG, STATE));
 		List<DocumentDTO> results = (List<DocumentDTO>) documentService.search(spec);
 		assertEquals(6, results.size());
 	}
 	
-	public void testSearchOrderBy() throws Exception {
+	@Test
+	void testSearchOrderBy() {
 		SearchSpecification spec = new SearchSpecification();
 		spec.addSortOrder(new SortOrder(DocumentDAO.BUS_SEG));
 		List<DocumentDTO> results = (List<DocumentDTO>) documentService.search(spec);
@@ -88,7 +94,8 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		assertEquals(STATE, document.getBusSeg());
 	}
 
-	public void testSearchOrderByNote() throws Exception {
+	@Test
+	void testSearchOrderByNote() {
 		SearchSpecification spec = new SearchSpecification();
 		spec.addSortOrder(new SortOrder(DocumentDAO.NOTE));
 		List<DocumentDTO> results = (List<DocumentDTO>) documentService.search(spec);
@@ -102,7 +109,8 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		assertEquals("Hello z", document.getNote());
 	}
 
-	public void testSearchOrderByDate() throws Exception {
+	@Test
+	void testSearchOrderByDate() {
 		SearchSpecification spec = new SearchSpecification();
 		spec.addSortOrder(new SortOrder(DocumentDAO.RCVD_DATE));
 		List<DocumentDTO> results = (List<DocumentDTO>) documentService.search(spec);
@@ -116,7 +124,8 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		assertEquals(FEDERAL, document.getBusSeg());
 	}
 
-	public void testSearchOrderByDateMax() throws Exception {
+	@Test
+	void testSearchOrderByDateMax() {
 		SearchSpecification spec = new SearchSpecification();
 		spec.addSortOrder(new SortOrder(DocumentDAO.RCVD_DATE));
 		spec.setMaxResults(2);
@@ -131,25 +140,28 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		assertEquals(STATE, document.getBusSeg());
 	}
 	
-	public void testQueryEmpty() throws Exception {
+	@Test
+	void testQueryEmpty() {
 		QuerySpecification spec = new QuerySpecification();
 	    List<?> results = documentService.query(spec);
 		assertEquals(0, results.size());
 	}
 
+	@Test
 	@SuppressWarnings("unchecked")
-	public void testQueryCount() throws Exception {
+	void testQueryCount() {
 		QuerySpecification spec = new QuerySpecification();
 		spec.addCondition(new Condition(DocumentDAO.BUS_SEG, STATE));
 		spec.addProjection(Projection.ROW_COUNT);
-		List<Integer> results = (List<Integer>) documentService.query(spec);
+		List<Long> results = (List<Long>) documentService.query(spec);
 		assertEquals(1, results.size());
-		int count = results.get(0);
-		assertEquals(6, count);
+		long count = results.get(0);
+		assertEquals(6L, count);
 	}
 
+	@Test
 	@SuppressWarnings("unchecked")
-	public void testQueryMinGroupBy() throws Exception {
+	void testQueryMinGroupBy() {
 		QuerySpecification spec = new QuerySpecification();
 		spec.addProjection(Projection.ROW_COUNT);
 		spec.addProjection(new QuerySpecification.Projection(DocumentDAO.BUS_SEG, QuerySpecification.Function.GROUP_BY));
@@ -161,23 +173,24 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		Object[] row;
 		
 		row = results.get(i++);
-		assertEquals(1, row[0]);
+		assertEquals(1L, row[0]);
 		assertEquals(FEDERAL, row[1]);
 		assertEquals(Timestamp.class, row[2].getClass());
 
 		row = results.get(i++);
-		assertEquals(6, row[0]);
+		assertEquals(6L, row[0]);
 		assertEquals(STATE, row[1]);
 		assertEquals(Timestamp.class, row[2].getClass());
 		
 		row = results.get(i++);
-		assertEquals(1, row[0]);
+		assertEquals(1L, row[0]);
 		assertEquals(COMMERCIAL, row[1]);
 		assertEquals(Timestamp.class, row[2].getClass());
 	}
 
+	@Test
 	@SuppressWarnings("unchecked")
-	public void testQueryAveGroupBy() throws Exception {
+	void testQueryAveGroupBy() {
 		QuerySpecification spec = new QuerySpecification();
 		spec.addProjection(Projection.ROW_COUNT);
 		spec.addProjection(new QuerySpecification.Projection(DocumentDAO.BUS_SEG, QuerySpecification.Function.GROUP_BY));
@@ -189,17 +202,17 @@ public class HibernateDocumentServiceTest extends AbstractJUnit38SpringContextTe
 		Object[] row;
 		
 		row = results.get(i++);
-		assertEquals(1, row[0]);
+		assertEquals(1L, row[0]);
 		assertEquals(FEDERAL, row[1]);
 		assertEquals(Double.class, row[2].getClass());
 
 		row = results.get(i++);
-		assertEquals(6, row[0]);
+		assertEquals(6L, row[0]);
 		assertEquals(STATE, row[1]);
 		assertEquals(Double.class, row[2].getClass());
 		
 		row = results.get(i++);
-		assertEquals(1, row[0]);
+		assertEquals(1L, row[0]);
 		assertEquals(COMMERCIAL, row[1]);
 		assertEquals(Double.class, row[2].getClass());
 	}

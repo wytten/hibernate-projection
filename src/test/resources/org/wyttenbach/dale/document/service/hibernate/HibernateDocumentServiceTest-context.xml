@@ -1,13 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
-	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
-       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-2.0.xsd
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
   ">
 
 	<import resource="classpath:hibernate-session-factory.xml" />
 
+	<context:property-placeholder location="classpath:hibernate.properties" />
+
+	<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="${hibernate.connection.driver_class}" />
+		<property name="url" value="${hibernate.connection.url}" />
+		<property name="username" value="${hibernate.connection.username}" />
+		<property name="password" value="${hibernate.connection.password}" />
+	</bean>
+
 	<bean id="sessionFactory" parent="abstractSessionFactory" />
+
+	<bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+
+	<tx:annotation-driven />
 
 	<bean id="documentDAO" class="org.wyttenbach.dale.document.dao.hibernate.HibernateDocumentDAO">
 		<property name="sessionFactory" ref="sessionFactory" />
@@ -20,6 +38,7 @@
 	</bean>
 
 	<bean id="documentService" class="org.wyttenbach.dale.document.service.hibernate.HibernateDocumentService">
+		<property name="sessionFactory" ref="sessionFactory" />
 		<property name="documentDAO" ref="documentDAO" />
 		<property name="documentDTOToDocument" ref="documentDTOToDocument" />
 		<property name="documentToDocumentDTO" ref="documentToDocumentDTO" />
